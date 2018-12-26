@@ -34,7 +34,16 @@ def flatten(d, parent_key='', sep='__'):
         else:
             items.append((new_key, str(v) if type(v) is list else v))
     return dict(items)
-        
+
+def schema_to_header(schema, name=''):
+    if schema['type'] != 'object':
+        return [name]
+    if name == '':
+        return [x for (sub_name, sub) in schema['properties'].items()
+                for x in schema_to_header(sub, sub_name)]
+    return [x for (sub_name, sub) in schema['properties'].items()
+            for x in schema_to_header(sub, ('%s__%s' % (name, sub_name)))]
+
 def persist_messages(delimiter, quotechar, messages):
     state = None
     schemas = {}
@@ -63,16 +72,6 @@ def persist_messages(delimiter, quotechar, messages):
 
             flattened_record = flatten(o['record'])
 
-            if o['stream'] not in headers and not file_is_empty:
-                with open(filename, 'r') as csvfile:
-                    reader = csv.reader(csvfile,
-                                        delimiter=delimiter,
-                                        quotechar=quotechar)
-                    first_line = next(reader)
-                    headers[o['stream']] = first_line if first_line else flattened_record.keys()
-            else:
-                headers[o['stream']] = flattened_record.keys()
-
             with open(filename, 'a') as csvfile:
                 writer = csv.DictWriter(csvfile,
                                         headers[o['stream']],
@@ -91,6 +90,7 @@ def persist_messages(delimiter, quotechar, messages):
         elif message_type == 'SCHEMA':
             stream = o['stream']
             schemas[stream] = o['schema']
+            headers[o['stream']] = schema_to_header(o['schema'], '')
             validators[stream] = Draft4Validator(o['schema'])
             key_properties[stream] = o['key_properties']
         else:

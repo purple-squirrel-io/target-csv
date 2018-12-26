@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import argparse
 import io
 import os
@@ -44,7 +43,7 @@ def schema_to_header(schema, name=''):
     return [x for (sub_name, sub) in schema['properties'].items()
             for x in schema_to_header(sub, ('%s__%s' % (name, sub_name)))]
 
-def persist_messages(delimiter, quotechar, messages):
+def persist_messages(delimiter, quotechar, filename, messages):
     state = None
     schemas = {}
     key_properties = {}
@@ -67,7 +66,8 @@ def persist_messages(delimiter, quotechar, messages):
 
             validators[o['stream']].validate(o['record'])
 
-            filename = o['stream'] + '-' + now + '.csv'
+            if not filename:
+                filename = o['stream'] + '-' + now + '.csv'
             file_is_empty = (not os.path.isfile(filename)) or os.stat(filename).st_size == 0
 
             flattened_record = flatten(o['record'])
@@ -139,6 +139,7 @@ def main():
     input_messages = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
     state = persist_messages(config.get('delimiter', ','),
                              config.get('quotechar', '"'),
+                             config.get('filename', ''),
                              input_messages)
 
     emit_state(state)
